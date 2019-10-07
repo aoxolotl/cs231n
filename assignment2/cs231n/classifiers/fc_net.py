@@ -280,9 +280,21 @@ class FullyConnectedNet(object):
         next_input = np.copy(X)
         
         for i in range(self.num_layers - 1):
-            next_input, cache = affine_relu_forward(next_input, \
-                                                    self.params[f"W{i+1}"], self.params[f"b{i+1}"])
-            cache_list.append(cache)
+            if self.normalization=='batchnorm':
+                next_input, cache = affine_bnorm_relu_forward(next_input, \
+                                                              self.params[f"W{i+1}"], \
+                                                              self.params[f"b{i+1}"], \
+                                                              self.params[f"gamma{i+1}"],\
+                                                              self.params[f"beta{i+1}"],\
+                                                              self.bn_params[i]
+                                                             )
+                cache_list.append(cache)
+
+            else:
+                next_input, cache = affine_relu_forward(next_input, \
+                                                        self.params[f"W{i+1}"], \
+                                                        self.params[f"b{i+1}"])
+                cache_list.append(cache)
         scores, out_cache = affine_forward(next_input, self.params[f"W{self.num_layers}"],\
                                            self.params[f"b{self.num_layers}"])
         cache_list.append(out_cache)
@@ -324,7 +336,10 @@ class FullyConnectedNet(object):
         grads[f"W{self.num_layers}"] += self.reg * self.params[f"W{self.num_layers}"]
         
         for i in range(self.num_layers - 1).__reversed__():
-            next_grad, grads[f"W{i+1}"], grads[f"b{i+1}"] = affine_relu_backward(next_grad, cache_list[i])
+            if self.normalization == 'batchnorm':
+                next_grad, grads[f"W{i+1}"], grads[f"b{i+1}"], grads[f"gamma{i+1}"], grads[f"beta{i+1}"] = affine_bnorm_relu_backward(next_grad, cache_list[i])
+            else:
+                next_grad, grads[f"W{i+1}"], grads[f"b{i+1}"] = affine_relu_backward(next_grad, cache_list[i])
             grads[f"W{i+1}"] += self.reg * self.params[f"W{i+1}"]
             
 
