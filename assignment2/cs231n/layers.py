@@ -324,7 +324,7 @@ def batchnorm_backward_alt(dout, cache):
     gamma = cache['gamma']
 
     dx = 1 / cache['den'] * (gamma / N)  * (N * dout - np.sum(dout, axis = 0) \
-                                            - norm_x * np.sum(dout * norm_x, axis = 0)
+                                            - norm_x * np.sum(dout * norm_x, axis = 0)\
                                             - 2 * np.sum(np.sum(dout * norm_x, axis = 0) * norm_x, axis = 0))
 
     dgamma = np.sum(dout * norm_x, axis = 0)
@@ -374,7 +374,20 @@ def layernorm_forward(x, gamma, beta, ln_param):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    cache = {}
+
+    # Transpose to get the feature wise mean, var etc.
+    xT = x.T
+    sample_mean = xT.mean(axis=0)
+    sample_var = np.var(xT, axis=0)
+    norm_xT = (xT - sample_mean) / np.sqrt(sample_var + eps)
+    norm_x = norm_xT.T
+    out = gamma * norm_x + beta
+
+    cache['den'] = np.sqrt(sample_var + eps)
+    cache['norm_x'] = norm_x
+    cache['gamma'] = gamma
+
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -409,7 +422,20 @@ def layernorm_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    N, D = dout.shape
+    gamma, den, norm_x = cache["gamma"], cache["den"], cache["norm_x"]
+    doutT = dout.T
+    dnorm_x = doutT * gamma[:, np.newaxis] # To match up the dimensions
+    
+    dvar = -1 / 2 * np.sum(dnorm_x * (norm_x.T / (den**2)), axis=0)
+    
+    dmean = np.sum(dnorm_x * -1 / den, axis=0) \
+            - (2 / N)  *  np.sum(dvar * (norm_x.T * den), axis = 0)
+    dx = dnorm_x / den + (2 / N) * dvar * (norm_x.T * den) \
+         + dmean / N
+    dx = dx.T
+    dgamma = np.sum(dout * norm_x, axis = 0)
+    dbeta = np.sum(dout, axis = 0)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
