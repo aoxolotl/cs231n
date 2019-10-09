@@ -425,14 +425,14 @@ def layernorm_backward(dout, cache):
     N, D = dout.shape
     gamma, den, norm_x = cache["gamma"], cache["den"], cache["norm_x"]
     doutT = dout.T
-    dnorm_x = doutT * gamma[:, np.newaxis] # To match up the dimensions
+    norm_xT = norm_x.T
+    dnorm_x = doutT * gamma[:, np.newaxis]
     
-    dvar = -1 / 2 * np.sum(dnorm_x * (norm_x.T / (den**2)), axis=0)
+    dvar = -1 / 2 * np.sum(dnorm_x * (norm_xT / (den**2)), axis=0)
     
-    dmean = np.sum(dnorm_x * -1 / den, axis=0) \
-            - (2 / N)  *  np.sum(dvar * (norm_x.T * den), axis = 0)
-    dx = dnorm_x / den + (2 / N) * dvar * (norm_x.T * den) \
-         + dmean / N
+    dmean = (-1 / den) * np.sum(dnorm_x, axis=0) \
+            - (2 / D)  *  np.sum(dvar * (norm_xT * den), axis = 0)
+    dx = dnorm_x / den + (2 / D) * dvar * (norm_xT * den) + dmean / D
     dx = dx.T
     dgamma = np.sum(dout * norm_x, axis = 0)
     dbeta = np.sum(dout, axis = 0)
@@ -484,7 +484,8 @@ def dropout_forward(x, dropout_param):
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        mask = (np.random.rand(*x.shape) < p) / p # Scale at train time
+        out = x * mask
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         #######################################################################
@@ -496,7 +497,7 @@ def dropout_forward(x, dropout_param):
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        out = x
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         #######################################################################
@@ -527,7 +528,7 @@ def dropout_backward(dout, cache):
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        dx = dout * mask
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         #######################################################################

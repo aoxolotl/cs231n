@@ -203,14 +203,14 @@ class FullyConnectedNet(object):
         for i in range(len(hidden_dims) - 1):
             self.params[f"W{i+2}"] = np.random.randn(hidden_dims[i], hidden_dims[i+1]) * weight_scale
             self.params[f"b{i+2}"] = np.zeros((hidden_dims[i+1]))
-            if self.normalization == 'batchnorm':
+            if not self.normalization == None:
                 self.params[f"gamma{i + 1}"] = np.ones(hidden_dims[i])
                 self.params[f"beta{i + 1}"] = np.zeros((hidden_dims[i]))
         
         self.params[f"W{self.num_layers}"] = np.random.randn(hidden_dims[-1], num_classes) * weight_scale
         self.params[f"b{self.num_layers}"] = np.zeros((num_classes))
         
-        if self.normalization == 'batchnorm':
+        if not self.normalization == None:
             self.params[f"gamma{len(hidden_dims)}"]  = np.ones(hidden_dims[-1])
             self.params[f"beta{len(hidden_dims)}"]  = np.zeros((hidden_dims[-1]))
         
@@ -277,6 +277,7 @@ class FullyConnectedNet(object):
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
         cache_list = []
+        dropout_caches = []
         next_input = np.copy(X)
         
         for i in range(self.num_layers - 1):
@@ -288,13 +289,25 @@ class FullyConnectedNet(object):
                                                               self.params[f"beta{i+1}"],\
                                                               self.bn_params[i]
                                                              )
-                cache_list.append(cache)
+            elif self.normalization=='layernorm':
+                next_input, cache = affine_lnorm_relu_forward(next_input, \
+                                                              self.params[f"W{i+1}"], \
+                                                              self.params[f"b{i+1}"], \
+                                                              self.params[f"gamma{i+1}"],\
+                                                              self.params[f"beta{i+1}"],\
+                                                              self.bn_params[i]
+                                                             )
 
             else:
                 next_input, cache = affine_relu_forward(next_input, \
                                                         self.params[f"W{i+1}"], \
                                                         self.params[f"b{i+1}"])
-                cache_list.append(cache)
+            cache_list.append(cache)
+            
+            if self.use_dropout:
+                next_input, dropout_cache = dropout_forward(next_input, self.dropout_param)
+                dropout_caches.append(dropout_cache)
+
         scores, out_cache = affine_forward(next_input, self.params[f"W{self.num_layers}"],\
                                            self.params[f"b{self.num_layers}"])
         cache_list.append(out_cache)
@@ -336,8 +349,16 @@ class FullyConnectedNet(object):
         grads[f"W{self.num_layers}"] += self.reg * self.params[f"W{self.num_layers}"]
         
         for i in range(self.num_layers - 1).__reversed__():
+
+            if self.use_dropout:
+                next_grad = dropout_backward(next_grad, dropout_caches[i])
+
             if self.normalization == 'batchnorm':
                 next_grad, grads[f"W{i+1}"], grads[f"b{i+1}"], grads[f"gamma{i+1}"], grads[f"beta{i+1}"] = affine_bnorm_relu_backward(next_grad, cache_list[i])
+
+            elif self.normalization == 'layernorm':
+                next_grad, grads[f"W{i+1}"], grads[f"b{i+1}"], grads[f"gamma{i+1}"], grads[f"beta{i+1}"] = affine_lnorm_relu_backward(next_grad, cache_list[i])
+
             else:
                 next_grad, grads[f"W{i+1}"], grads[f"b{i+1}"] = affine_relu_backward(next_grad, cache_list[i])
             grads[f"W{i+1}"] += self.reg * self.params[f"W{i+1}"]
